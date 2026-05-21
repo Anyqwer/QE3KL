@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="release|x64">
+      <Configuration>release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ext\curl\curl.h" />
+    <ClInclude Include="ext\curl\curlver.h" />
+    <ClInclude Include="ext\curl\easy.h" />
+    <ClInclude Include="ext\curl\header.h" />
+    <ClInclude Include="ext\curl\include\curl.h" />
+    <ClInclude Include="ext\curl\include\curlver.h" />
+    <ClInclude Include="ext\curl\include\easy.h" />
+    <ClInclude Include="ext\curl\include\header.h" />
+    <ClInclude Include="ext\curl\include\mprintf.h" />
+    <ClInclude Include="ext\curl\include\multi.h" />
+    <ClInclude Include="ext\curl\include\options.h" />
+    <ClInclude Include="ext\curl\include\stdcheaders.h" />
+    <ClInclude Include="ext\curl\include\system.h" />
+    <ClInclude Include="ext\curl\include\typecheck-gcc.h" />
+    <ClInclude Include="ext\curl\include\urlapi.h" />
+    <ClInclude Include="ext\curl\include\websockets.h" />
+    <ClInclude Include="ext\curl\mprintf.h" />
+    <ClInclude Include="ext\curl\multi.h" />
+    <ClInclude Include="ext\curl\options.h" />
+    <ClInclude Include="ext\curl\stdcheaders.h" />
+    <ClInclude Include="ext\curl\system.h" />
+    <ClInclude Include="ext\curl\typecheck-gcc.h" />
+    <ClInclude Include="ext\curl\urlapi.h" />
+    <ClInclude Include="ext\curl\websockets.h" />
+    <ClInclude Include="ext\easywsclient\easywsclient.hpp" />
+    <ClInclude Include="ext\fnv1a\fnv1a.hpp" />
+    <ClInclude Include="ext\nlohmann\json.hpp" />
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="src\core\schema.hpp" />
+    <ClInclude Include="src\core\simple_optimized_cache.hpp" />
+    <ClInclude Include="src\sdk\datatypes\utl_ts_hash.hpp" />
+    <ClInclude Include="src\driver\driver.hpp" />
+    <ClInclude Include="src\sdk\interfaces\game_entity_system.hpp" />
+    <ClInclude Include="src\sdk\interfaces\global_vars.hpp" />
+    <ClInclude Include="src\features\features.hpp" />
+    <ClInclude Include="src\sdk\datatypes\vector.hpp" />
+    <ClInclude Include="src\utils\address.hpp" />
+    <ClInclude Include="src\utils\config.hpp" />
+    <ClInclude Include="src\utils\memory.hpp" />
+    <ClInclude Include="src\utils\exception.hpp" />
+    <ClInclude Include="src\utils\skCrypter.h" />
+    <ClInclude Include="src\utils\utils.hpp" />
+    <ClInclude Include="src\core\batch_structures.hpp" />
+    <ClInclude Include="src\core\batch_optimized_cache.hpp" />
+    <ClInclude Include="usermode.hpp" />
+    <ClInclude Include="src\pch.hpp" />
+    <ClInclude Include="src\overlay\overlay.hpp" />
+    <ClInclude Include="src\overlay\OS-ImGui\OS-ImGui.h" />
+    <ClInclude Include="src\overlay\OS-ImGui\OS-ImGui_External.h" />
+    <ClInclude Include="src\overlay\OS-ImGui\OS-ImGui_Base.h" />
+    <ClInclude Include="src\overlay\OS-ImGui\OS-ImGui_Struct.h" />
+    <ClInclude Include="src\overlay\OS-ImGui\OS-ImGui_Exception.hpp" />
+    <ClInclude Include="src\shared\game_data.hpp" />
+    <ClInclude Include="src\features\autoswap\autoswap.hpp" />
+    <ClInclude Include="src\features\autopistol\autopistol.hpp" />
+    <ClInclude Include="src\features\bhop\bhop.hpp" />
+    <ClInclude Include="src\shared\json_adapter.hpp" />
+    <ClInclude Include="src\shared\view.hpp" />
+    <ClInclude Include="src\tkazer_base\CS2_External\OS-ImGui\imgui\imgui.h" />
+    <ClInclude Include="src\tkazer_base\CS2_External\OS-ImGui\imgui\imgui_internal.h" />
+    <ClInclude Include="src\tkazer_base\CS2_External\OS-ImGui\imgui\imgui_impl_dx11.h" />
+    <ClInclude Include="src\tkazer_base\CS2_External\OS-ImGui\imgui\imgui_impl_win32.h" />
+    <ClInclude Include="src\tkazer_base\CS2_External\OS-ImGui\imgui\imconfig.h" />
+    <ClInclude Include="src\tkazer_base\CS2_External\OS-ImGui\imgui\imstb_rectpack.h" />
+    <ClInclude Include="src\tkazer_base\CS2_External\OS-ImGui\imgui\imstb_textedit.h" />
+    <ClInclude Include="src\tkazer_base\CS2_External\OS-ImGui\imgui\imstb_truetype.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ext\easywsclient\easywsclient.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\core\interfaces.cpp" />
+    <ClCompile Include="src\core\sdk.cpp" />
+    <ClCompile Include="src\dllmain.cpp" />
+    <ClCompile Include="src\updater\updater.cpp" />
+    <ClCompile Include="src\features\bomb\bomb.cpp" />
+    <ClCompile Include="src\features\features.cpp" />
+    <ClCompile Include="src\features\players\players.cpp" />
+    <ClCompile Include="src\features\autoswap\autoswap.cpp" />
+    <ClCompile Include="src\features\autopistol\autopistol.cpp" />
+    <ClCompile Include="src\features\bhop\bhop.cpp" />
+    <ClCompile Include="src\sdk\entity.cpp" />
+    <ClCompile Include="src\utils\address.cpp" />
+    <ClCompile Include="src\pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\core\schema.cpp" />
+    <ClCompile Include="src\utils\config.cpp" />
+    <ClCompile Include="src\utils\exception.cpp" />
+    <ClCompile Include="src\utils\memory.cpp" />
+    <ClCompile Include="src\utils\utils.cpp" />
+    <ClCompile Include="src\overlay\overlay.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\overlay\OS-ImGui\OS-ImGui.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\overlay\OS-ImGui\OS-ImGui_Base.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\overlay\OS-ImGui\OS-ImGui_External.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\tkazer_base\CS2_External\OS-ImGui\imgui\imgui.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\tkazer_base\CS2_External\OS-ImGui\imgui\imgui_draw.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\tkazer_base\CS2_External\OS-ImGui\imgui\imgui_tables.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\tkazer_base\CS2_External\OS-ImGui\imgui\imgui_widgets.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\tkazer_base\CS2_External\OS-ImGui\imgui\imgui_impl_dx11.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\tkazer_base\CS2_External\OS-ImGui\imgui\imgui_impl_win32.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\shared\game_data.cpp" />
+    <ClCompile Include="src\shared\json_adapter.cpp" />
+    <ClCompile Include="src\shared\view.cpp" />
+    <ClCompile Include="src\core\batch_memory_reader.cpp" />
+    <ClCompile Include="src\core\batch_optimized_cache.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="usermode.rc" />
+    <ResourceCompile Include="src\sdk\sounds\resources.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="..\..\..\..\Downloads\icon1.ico" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{6A55EA2E-776D-410E-B7F1-DEA56E9BDFCD}</ProjectGuid>
+    <RootNamespace>usermode</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.22621.0</WindowsTargetPlatformVersion>
+    <ProjectName>usermode</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\$(Configuration)\intermediates\</IntDir>
+    <IncludePath>$(IncludePath)</IncludePath>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+    <TargetName>Any^-^</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='release|x64'">
+    <ClCompile>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CRT_SECURE_NO_WARNINGS;NOMINMAX;CURL_STATICLIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>MinSpace</Optimization>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
+      <OmitFramePointers>true</OmitFramePointers>
+      <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
+      <ControlFlowGuard>false</ControlFlowGuard>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
+      <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\src\;$(ProjectDir)\src\tkazer_base\CS2_External\OS-ImGui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+      <BuildStlModules>false</BuildStlModules>
+      <AdditionalOptions> /bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>crypt32.lib;wldap32.lib;normaliz.lib;libcurl_a.lib;d3d11.lib;dxgi.lib;d3dcompiler.lib;dwmapi.lib;user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
+      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <AdditionalLibraryDirectories>$(SolutionDir)ext\curl\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
