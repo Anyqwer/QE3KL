@@ -86,10 +86,10 @@ void PlaySoundWithVolume(UINT resource_id, float volume) {
 
 bool main()
 {
-    // Загружаем оффсеты из JSON файлов
-    if (!updater::load_json_offsets())
+    // Загружаем оффсеты из JSON файлов (динамический режим предпочитается)
+    if (!updater::load_dynamic_offsets())
     {
-        LOG_ERROR("failed to load offsets from JSON files");
+        LOG_ERROR("failed to load dynamic offsets from JSON files");
         return {};
     }
 

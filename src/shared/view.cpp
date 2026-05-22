@@ -1,5 +1,8 @@
 #include "pch.hpp"
 #include "view.hpp"
+#include <algorithm>
+#include "../tkazer_base/CS2_External/OS-ImGui/imgui/imgui.h"
+
 
 namespace shared
 {
@@ -76,6 +79,36 @@ namespace shared
         }
         
         return true;
+    }
+
+    float cross_product(const ImVec2& O, const ImVec2& A, const ImVec2& B) {
+        return (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x);
+    }
+
+    std::vector<ImVec2> build_convex_hull(std::vector<ImVec2>& points) {
+        size_t n = points.size(), k = 0;
+        if (n <= 3) return points;
+
+        std::vector<ImVec2> hull(2 * n);
+
+        std::sort(points.begin(), points.end(), [](const ImVec2& a, const ImVec2& b) {
+            return a.x < b.x || (a.x == b.x && a.y < b.y);
+        });
+
+        // lower
+        for (size_t i = 0; i < n; ++i) {
+            while (k >= 2 && cross_product(hull[k - 2], hull[k - 1], points[i]) <= 0) k--;
+            hull[k++] = points[i];
+        }
+
+        // upper
+        for (size_t i = n - 1, t = k + 1; i > 0; --i) {
+            while (k >= t && cross_product(hull[k - 2], hull[k - 1], points[i - 1]) <= 0) k--;
+            hull[k++] = points[i - 1];
+        }
+
+        hull.resize(k - 1);
+        return hull;
     }
 
     bool world_to_screen(

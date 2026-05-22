@@ -11,4 +11,5 @@ namespace updater
     // Загружает оффсеты из JSON-файлов в g_offsets
     // Возвращает true при успехе, false при ошибке
     bool load_json_offsets();
+    bool load_dynamic_offsets();
 }

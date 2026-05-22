@@ -1,6 +1,9 @@
 #pragma once
 #include "game_data.hpp"
 #include "../sdk/datatypes/vector.hpp"
+#include <vector>
+// Forward declare ImGui 2D vector to avoid pulling imgui headers into shared API
+struct ImVec2;
 
 namespace shared
 {
@@ -35,4 +38,8 @@ namespace shared
         float screen_width,
         float screen_height
     );
+
+    // Convex hull utilities (used to draw Inferno/molotov area)
+    float cross_product(const ImVec2& O, const ImVec2& A, const ImVec2& B);
+    std::vector<ImVec2> build_convex_hull(std::vector<ImVec2>& points);
 }

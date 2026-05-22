@@ -74,6 +74,15 @@ namespace g_offsets
     inline std::ptrdiff_t bone_array = 0;
     inline std::ptrdiff_t m_vecAbsOrigin = 0;
 
+    // Inferno (molotov) offsets
+    inline std::ptrdiff_t m_fireCount = 0;
+    inline std::ptrdiff_t m_bFireIsBurning = 0;
+    inline std::ptrdiff_t m_firePositions = 0;
+
+    // Smoke grenade offsets
+    inline std::ptrdiff_t m_bDidSmokeEffect = 0;
+    inline std::ptrdiff_t m_nSmokeEffectTickBegin = 0;
+
     // schema system offsets
     inline std::ptrdiff_t schema_field_name = 0;
     inline std::ptrdiff_t schema_field_offset = 0;

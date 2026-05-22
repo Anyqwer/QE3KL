@@ -11,13 +11,13 @@ namespace updater
     void run_dumper()
     {
         LOG_INFO("running cs2-dumper.exe to generate fresh offsets...");
-        
+
         // Запускаем cs2-dumper.exe
         system("cs2-dumper.exe");
-        
+
         // Ждем сохранения файлов
         std::this_thread::sleep_for(std::chrono::seconds(2));
-        
+
         LOG_INFO("cs2-dumper.exe execution completed");
     }
 
@@ -121,6 +121,25 @@ namespace updater
                 client_dll_json["client.dll"].contains("classes"))
             {
                 auto& classes = client_dll_json["client.dll"]["classes"];
+
+            // Helper: safely read an offset value which may be a hex string ("0x1234") or a number
+            auto read_offset = [](const nlohmann::json& node) -> std::ptrdiff_t {
+                try {
+                    if (node.is_string()) {
+                        const auto s = node.get<std::string>();
+                        // strip possible 0x prefix
+                        return static_cast<std::ptrdiff_t>(std::stoull(s, nullptr, 16));
+                    }
+                    else if (node.is_number_unsigned()) {
+                        return static_cast<std::ptrdiff_t>(node.get<std::uint64_t>());
+                    }
+                    else if (node.is_number_integer()) {
+                        return static_cast<std::ptrdiff_t>(node.get<std::int64_t>());
+                    }
+                } catch (...) {
+                }
+                return 0;
+            };
                 
                 // C_BaseEntity::m_pCollision
                 if (classes.contains("C_BaseEntity") && 
@@ -199,14 +218,19 @@ namespace updater
                     auto& f = classes["C_BaseEntity"]["fields"];
                     if (f.contains("m_iHealth")) {
                         Offset::Entity.Health = f["m_iHealth"].get<std::ptrdiff_t>();
+                        g_offsets::m_iHealth = f["m_iHealth"].get<std::ptrdiff_t>();
                         Offset::Pawn.CurrentHealth = f["m_iHealth"].get<std::ptrdiff_t>();
                     }
                     if (f.contains("m_iMaxHealth")) Offset::Pawn.MaxHealth = f["m_iMaxHealth"].get<std::ptrdiff_t>();
                     if (f.contains("m_iTeamNum")) {
                         Offset::Entity.TeamID = f["m_iTeamNum"].get<std::ptrdiff_t>();
+                        g_offsets::m_iTeamNum = f["m_iTeamNum"].get<std::ptrdiff_t>();
                         Offset::Pawn.iTeamNum = f["m_iTeamNum"].get<std::ptrdiff_t>();
                     }
-                    if (f.contains("m_pGameSceneNode")) Offset::Pawn.GameSceneNode = f["m_pGameSceneNode"].get<std::ptrdiff_t>();
+                    if (f.contains("m_pGameSceneNode")) {
+                        Offset::Pawn.GameSceneNode = f["m_pGameSceneNode"].get<std::ptrdiff_t>();
+                        g_offsets::m_pGameSceneNode = f["m_pGameSceneNode"].get<std::ptrdiff_t>();
+                    }
                     if (f.contains("m_fFlags")) Offset::Pawn.fFlags = f["m_fFlags"].get<std::ptrdiff_t>();
                 }
 
@@ -283,4 +307,97 @@ namespace updater
             return false;
         }
     }
-}
+
+    bool load_dynamic_offsets()
+    {
+        try {
+            // Reuse existing load_json_offsets for basic offsets
+            if (!load_json_offsets()) return false;
+
+            // Load client_dll.json and check for inferno / smoke fields
+            std::ifstream client_dll_json_file("output/client_dll.json");
+            if (!client_dll_json_file.is_open()) {
+                LOG_ERROR("failed to open client_dll.json for dynamic offsets");
+                return false;
+            }
+
+            nlohmann::json client_dll_json;
+            client_dll_json_file >> client_dll_json;
+            client_dll_json_file.close();
+
+            if (!client_dll_json.contains("client.dll") || !client_dll_json["client.dll"].contains("classes"))
+                return false;
+
+            auto& classes = client_dll_json["client.dll"]["classes"];
+
+            // Helper: safely read an offset value which may be a hex string ("0x1234") or a number
+            auto read_offset = [](const nlohmann::json& node) -> std::ptrdiff_t {
+                try {
+                    if (node.is_string()) {
+                        const auto s = node.get<std::string>();
+                        return static_cast<std::ptrdiff_t>(std::stoull(s, nullptr, 16));
+                    }
+                    else if (node.is_number_unsigned()) {
+                        return static_cast<std::ptrdiff_t>(node.get<std::uint64_t>());
+                    }
+                    else if (node.is_number_integer()) {
+                        return static_cast<std::ptrdiff_t>(node.get<std::int64_t>());
+                    }
+                    else if (node.is_object() && node.contains("offset")) {
+                        const auto off = node["offset"];
+                        if (off.is_string()) return static_cast<std::ptrdiff_t>(std::stoull(off.get<std::string>(), nullptr, 16));
+                        if (off.is_number_unsigned()) return static_cast<std::ptrdiff_t>(off.get<std::uint64_t>());
+                        if (off.is_number_integer()) return static_cast<std::ptrdiff_t>(off.get<std::int64_t>());
+                    }
+                } catch (...) {
+                }
+                return 0;
+            };
+
+            // C_Inferno
+            if (classes.contains("C_Inferno") && classes["C_Inferno"].contains("fields")) {
+                auto& f = classes["C_Inferno"]["fields"];
+                if (f.contains("m_fireCount")) {
+                    if (f["m_fireCount"].is_object() && f["m_fireCount"].contains("offset")) g_offsets::m_fireCount = read_offset(f["m_fireCount"]["offset"]);
+                    else g_offsets::m_fireCount = read_offset(f["m_fireCount"]);
+                }
+                if (f.contains("m_bFireIsBurning")) {
+                    if (f["m_bFireIsBurning"].is_object() && f["m_bFireIsBurning"].contains("offset")) g_offsets::m_bFireIsBurning = read_offset(f["m_bFireIsBurning"]["offset"]);
+                    else g_offsets::m_bFireIsBurning = read_offset(f["m_bFireIsBurning"]);
+                }
+                if (f.contains("m_firePositions")) {
+                    if (f["m_firePositions"].is_object() && f["m_firePositions"].contains("offset")) g_offsets::m_firePositions = read_offset(f["m_firePositions"]["offset"]);
+                    else g_offsets::m_firePositions = read_offset(f["m_firePositions"]);
+                }
+            }
+
+            // C_SmokeGrenadeProjectile
+            if (classes.contains("C_SmokeGrenadeProjectile") && classes["C_SmokeGrenadeProjectile"].contains("fields")) {
+                auto& f = classes["C_SmokeGrenadeProjectile"]["fields"];
+                if (f.contains("m_bDidSmokeEffect")) {
+                    if (f["m_bDidSmokeEffect"].is_object() && f["m_bDidSmokeEffect"].contains("offset")) g_offsets::m_bDidSmokeEffect = read_offset(f["m_bDidSmokeEffect"]["offset"]);
+                    else g_offsets::m_bDidSmokeEffect = read_offset(f["m_bDidSmokeEffect"]);
+                }
+                if (f.contains("m_nSmokeEffectTickBegin")) {
+                    if (f["m_nSmokeEffectTickBegin"].is_object() && f["m_nSmokeEffectTickBegin"].contains("offset")) g_offsets::m_nSmokeEffectTickBegin = read_offset(f["m_nSmokeEffectTickBegin"]["offset"]);
+                    else g_offsets::m_nSmokeEffectTickBegin = read_offset(f["m_nSmokeEffectTickBegin"]);
+                }
+            }
+
+            // Ensure GameSceneNode origin offset available
+            if (classes.contains("CGameSceneNode") && classes["CGameSceneNode"].contains("fields") && classes["CGameSceneNode"]["fields"].contains("m_vecAbsOrigin")) {
+                auto& node = classes["CGameSceneNode"]["fields"]["m_vecAbsOrigin"];
+                if (node.is_object() && node.contains("offset")) g_offsets::m_vecAbsOrigin = read_offset(node["offset"]);
+                else g_offsets::m_vecAbsOrigin = read_offset(node);
+            }
+
+            LOG_INFO("dynamic offsets loaded from client_dll.json");
+            return true;
+        }
+        catch (const std::exception& e) {
+            LOG_ERROR("exception while loading dynamic offsets: %s", e.what());
+            return false;
+        }
+    }
+
+} // namespace updater
