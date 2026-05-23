@@ -12,6 +12,7 @@
 #include <optional>
 #include <string>
 #include <algorithm>
+#include <cctype>
 #include <map>
 #include <vector>
 #include <cstdio>
@@ -57,6 +58,9 @@ static std::vector<HitMarkerEvent> g_hitmarkers;
 static std::map<int, int> g_health_cache; // previous hp per player index
 static std::map<int, float> g_anim_hp;    // animated HP per player index
 
+// Memory reader (shared across files)
+extern const std::unique_ptr<c_memory> m_memory;
+
 // Draw corner box with gradient fill and outlined corner lines
 void DrawCornerBoxAndGradient(ImDrawList* draw_list, float x, float y, float w, float h, ImU32 color)
 {
@@ -96,26 +100,33 @@ void DrawCornerBoxAndGradient(ImDrawList* draw_list, float x, float y, float w, 
 }
 
 
+
+
 // Render molotov/inferno area (convex hull of fire points)
 void RenderMolotovInferno(uintptr_t entity_ptr, const std::array<float, 16>& view_matrix, float screen_width, float screen_height)
 {
-    // TODO: Подставить реальные оффсеты из свежего дампа
-    // Например: int fire_count = m_memory->read_t<int>(entity_ptr + offsets::m_fireCount);
+    // Защита: проверяем, что оффсеты успешно загрузились
+    if (!g_offsets::m_fireCount || !g_offsets::m_bFireIsBurning || !g_offsets::m_firePositions) return;
+
+    // Читаем количество точек огня
     int fire_count = 0;
+    try { fire_count = m_memory->read_t<int>(entity_ptr + g_offsets::m_fireCount); } catch(...) { return; }
     if (fire_count <= 0 || fire_count > 64) return;
 
     std::vector<ImVec2> screen_points;
 
-    for (int i = 0; i < fire_count; ++i)
+    for (int i = 0; i < fire_count; ++i) 
     {
-        // TODO: Прочитать статус горения и позицию конкретного огонька
-        // bool is_burning = m_memory->read_t<bool>(entity_ptr + offsets::m_bFireIsBurning + i);
-        // vector_t fire_pos = m_memory->read_t<vector_t>(entity_ptr + offsets::m_firePositions + (i * sizeof(vector_t)));
-        bool is_burning = false; // ЗАГЛУШКА
-        vector_t fire_pos = {0,0,0}; // ЗАГЛУШКА
+        // Читаем статус горения конкретной точки (массив bool)
+        bool is_burning = false;
+        try { is_burning = m_memory->read_t<bool>(entity_ptr + g_offsets::m_bFireIsBurning + i); } catch(...) { is_burning = false; }
 
-        if (is_burning)
+        if (is_burning) 
         {
+            // Читаем позицию точки (массив Vector, каждая точка занимает sizeof(vector_t))
+            vector_t fire_pos = {0,0,0};
+            try { fire_pos = m_memory->read_t<vector_t>(entity_ptr + g_offsets::m_firePositions + (i * sizeof(vector_t))); } catch(...) { continue; }
+
             vector_t screen_pos;
             if (shared::world_to_screen(fire_pos, screen_pos, view_matrix, screen_width, screen_height)) {
                 screen_points.push_back(ImVec2(screen_pos.m_x, screen_pos.m_y));
@@ -123,13 +134,16 @@ void RenderMolotovInferno(uintptr_t entity_ptr, const std::array<float, 16>& vie
         }
     }
 
-    if (screen_points.size() >= 3) {
-        // Build hull
+    if (screen_points.size() >= 3) 
+    {
+        // 1. Строим полигон (Convex Hull)
         std::vector<ImVec2> hull = shared::build_convex_hull(screen_points);
 
-        ImU32 fill_color = IM_COL32(255, 80, 0, 60);
+        // 2. Заливка полигона огня
+        ImU32 fill_color = IM_COL32(255, 80, 0, 60); // Оранжевый полупрозрачный
         ImGui::GetBackgroundDrawList()->AddConvexPolyFilled(hull.data(), hull.size(), fill_color);
 
+        // 3. Обводка полигона
         ImU32 outline_color = IM_COL32(255, 120, 0, 255);
         ImGui::GetBackgroundDrawList()->AddPolyline(hull.data(), hull.size(), outline_color, ImDrawFlags_Closed, 2.0f);
     }
@@ -138,24 +152,36 @@ void RenderMolotovInferno(uintptr_t entity_ptr, const std::array<float, 16>& vie
 // Render smoke grenade ring + timer
 void RenderSmokeGrenade(uintptr_t entity_ptr, float global_time, const std::array<float, 16>& view_matrix, float screen_width, float screen_height)
 {
-    // TODO: Прочитать оффсеты смока
-    // bool did_smoke = m_memory->read_t<bool>(entity_ptr + offsets::m_bDidSmokeEffect);
-    // int tick_begin = m_memory->read_t<int>(entity_ptr + offsets::m_nSmokeEffectTickBegin);
-    // vector_t smoke_origin = m_memory->read_t<vector_t>(entity_ptr + m_pGameSceneNode + m_vecAbsOrigin);
+    // Защита
+    if (!g_offsets::m_bDidSmokeEffect || !g_offsets::m_nSmokeEffectTickBegin || !g_offsets::m_pGameSceneNode || !g_offsets::m_vecAbsOrigin) return;
 
-    bool did_smoke = false; // ЗАГЛУШКА
-    int tick_begin = 0; // ЗАГЛУШКА
-    vector_t smoke_origin = {0,0,0}; // ЗАГЛУШКА
-
+    // Проверяем, раскрылся ли смок
+    bool did_smoke = false;
+    try { did_smoke = m_memory->read_t<bool>(entity_ptr + g_offsets::m_bDidSmokeEffect); } catch(...) { return; }
     if (!did_smoke) return;
 
-    float start_time = tick_begin * (1.0f / 64.0f);
+    // Получаем Scene Node для чтения координат
+    uintptr_t scene_node = 0;
+    try { scene_node = m_memory->read_t<uintptr_t>(entity_ptr + g_offsets::m_pGameSceneNode); } catch(...) { scene_node = 0; }
+    if (!scene_node) return; // Защита от нулевого указателя
+
+    // Читаем позицию
+    vector_t smoke_origin = {0,0,0};
+    try { smoke_origin = m_memory->read_t<vector_t>(scene_node + g_offsets::m_vecAbsOrigin); } catch(...) { return; }
+
+    // Читаем тик начала
+    int tick_begin = 0;
+    try { tick_begin = m_memory->read_t<int>(entity_ptr + g_offsets::m_nSmokeEffectTickBegin); } catch(...) { tick_begin = 0; }
+
+    // Вычисляем время жизни
+    float start_time = tick_begin * (1.0f / 64.0f); // 64 тика в секунду - стандарт CS2
     float time_alive = global_time - start_time;
-    float time_left = 18.0f - time_alive;
+    float time_left = 18.0f - time_alive; // Смок в CS2 длится ровно 18 сек
 
     if (time_left <= 0.0f || time_left > 18.0f) return;
 
-    float smoke_radius = 144.0f;
+    // 1. Рендер 3D кольца на земле
+    float smoke_radius = 144.0f; // Физический радиус смока
     std::vector<ImVec2> ring_points;
     int segments = 32;
 
@@ -173,12 +199,14 @@ void RenderSmokeGrenade(uintptr_t entity_ptr, float global_time, const std::arra
         }
     }
 
+    // Если весь круг виден на экране, рисуем его
     if (ring_points.size() == (size_t)segments + 1) {
         ImU32 smoke_color = IM_COL32(180, 200, 255, 100);
         ImGui::GetBackgroundDrawList()->AddPolyline(ring_points.data(), ring_points.size(), smoke_color, 0, 2.0f);
         ImGui::GetBackgroundDrawList()->AddConvexPolyFilled(ring_points.data(), ring_points.size(), IM_COL32(150, 180, 255, 30));
     }
 
+    // 2. Таймер в центре кольца
     vector_t center_2d;
     if (shared::world_to_screen(smoke_origin, center_2d, view_matrix, screen_width, screen_height)) {
         char timer_text[16];
@@ -187,6 +215,7 @@ void RenderSmokeGrenade(uintptr_t entity_ptr, float global_time, const std::arra
         ImU32 text_col = (time_left < 3.0f) ? IM_COL32(255, 50, 50, 255) : IM_COL32(255, 255, 255, 255);
         ImVec2 text_size = ImGui::CalcTextSize(timer_text);
 
+        // Красивый таймер с черной обводкой для читаемости на любом фоне
         ImGui::GetBackgroundDrawList()->AddText(ImVec2(center_2d.m_x - text_size.x / 2 + 1, center_2d.m_y - text_size.y / 2 + 1), IM_COL32(0,0,0,255), timer_text);
         ImGui::GetBackgroundDrawList()->AddText(ImVec2(center_2d.m_x - text_size.x / 2, center_2d.m_y - text_size.y / 2), text_col, timer_text);
     }
