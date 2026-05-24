@@ -124,6 +124,23 @@ namespace shared
         return last_update_time.load(std::memory_order_acquire);
     }
 
+    void HitmarkerBus::push(bool is_kill)
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        queue.push_back(HitmarkerPulse{ is_kill });
+    }
+
+    std::vector<HitmarkerPulse> HitmarkerBus::drain_all()
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (queue.empty())
+            return {};
+
+        std::vector<HitmarkerPulse> out = std::move(queue);
+        queue.clear();
+        return out;
+    }
+
     void DoubleBufferedGameState::swap_buffers()
     {
         // Memory barrier: ensure all writes to write buffer are visible before swap

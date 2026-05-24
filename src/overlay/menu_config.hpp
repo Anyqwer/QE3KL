@@ -72,8 +72,8 @@ namespace esp
         int currentRandomDelay = 0;    // Вычисленная задержка с учетом рандома
         bool isTargetInFocus = false;  // Флаг: враг уже в прицеле и таймер идет
 
-        // Bomb Window - DISABLED
-        // bool ShowBombWindow = true;
+        bool ShowBombTimer = true;
+        bool ShowHitmarkers = true;
     };
 
     // Global menu config

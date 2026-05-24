@@ -272,6 +272,9 @@ static constexpr size_t BONE_ARRAY_SIZE = MAX_BONES_BATCH * BONE_SIZE; // 960 by
 bool f::players::get_shared_data(int32_t idx, c_cs_player_controller* player, c_cs_player_pawn* player_pawn, shared::PlayerData& out_data)
 {
 	out_data.index = idx;
+	const auto pawn_handle = player_pawn->get_ref_e_handle();
+	if (pawn_handle.is_valid())
+		out_data.entity_id = pawn_handle.get_entry_idx();
 	const uintptr_t pawn_base = reinterpret_cast<uintptr_t>(player_pawn);
 	
 	// === BATCH 1: Read basic pawn data (health, team, scene_node, collision, velocity) ===
@@ -328,6 +331,7 @@ bool f::players::get_shared_data(int32_t idx, c_cs_player_controller* player, c_
 	
 	// RCS data - shots fired
 	out_data.shots_fired = player_pawn->m_iShotsFired();
+	out_data.is_scoped = player_pawn->m_bIsScoped();
 	
 	// Aim punch - still needs pointer chase (services pointer)
 	const auto aim_punch_services = player_pawn->m_pAimPunchServices();

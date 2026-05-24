@@ -17,10 +17,9 @@ namespace f::players
 
 namespace f::bomb
 {
+	bool find_planted_bomb(shared::BombData& out_data);
 	void get_carried_bomb(c_base_entity* bomb);
 	void get_planted_bomb(c_planted_c4* planted_c4);
-	
-	// New function for shared data
 	bool get_shared_bomb(c_planted_c4* planted_c4, shared::BombData& out_data);
 }
 

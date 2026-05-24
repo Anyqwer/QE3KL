@@ -42,6 +42,7 @@
     <ClInclude Include="src\sdk\interfaces\game_entity_system.hpp" />
     <ClInclude Include="src\sdk\interfaces\global_vars.hpp" />
     <ClInclude Include="src\features\features.hpp" />
+    <ClInclude Include="src\features\bomb\bomb.hpp" />
     <ClInclude Include="src\sdk\datatypes\vector.hpp" />
     <ClInclude Include="src\updater\dynamic_offsets.hpp" />
     <ClInclude Include="src\utils\address.hpp" />

@@ -6,7 +6,93 @@
 #include "../core/entity_cache.hpp"
 #include "../core/simple_optimized_cache.hpp"
 #include "../utils/skCrypter.h"
+#include "bomb/bomb.hpp"
 #include "triggerbot/triggerbot.hpp"
+#include <unordered_map>
+
+namespace
+{
+	bool crosshair_matches_player(int crosshair_id, const shared::PlayerData& player)
+	{
+		if (crosshair_id <= 0)
+			return false;
+
+		return player.entity_id == crosshair_id ||
+			player.index == crosshair_id;
+	}
+
+	void process_hitmarkers(const shared::LocalPlayerData& local, const std::vector<shared::PlayerData>& players)
+	{
+		static std::unordered_map<int, int> prev_hp;
+		static int last_crosshair_id = -1;
+		static int32_t last_shots_fired = 0;
+		static auto last_shot_time = std::chrono::steady_clock::now();
+
+		if (local.crosshair_id > 0)
+			last_crosshair_id = local.crosshair_id;
+
+		if (local.shots_fired > last_shots_fired)
+		{
+			last_shots_fired = local.shots_fired;
+			last_shot_time = std::chrono::steady_clock::now();
+		}
+
+		const auto ms_since_shot = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now() - last_shot_time).count();
+
+		for (const auto& player : players)
+		{
+			if (player.team == local.team)
+			{
+				prev_hp[player.index] = player.health;
+				continue;
+			}
+
+			const auto it = prev_hp.find(player.index);
+			if (it == prev_hp.end())
+			{
+				prev_hp[player.index] = player.health;
+				continue;
+			}
+
+			const int previous_hp = it->second;
+			const bool took_damage = player.health < previous_hp && !player.is_dead;
+			const bool got_kill = !player.is_dead && previous_hp > 0 && player.is_dead;
+
+			if (took_damage || got_kill)
+			{
+				const bool crosshair_now = crosshair_matches_player(local.crosshair_id, player);
+				const bool crosshair_recent = crosshair_matches_player(last_crosshair_id, player);
+				const bool shot_recent = ms_since_shot >= 0 && ms_since_shot < 450;
+
+				if (crosshair_now || (shot_recent && crosshair_recent) || got_kill && crosshair_recent)
+				{
+					const bool is_kill = got_kill || player.health <= 0;
+					shared::g_hitmarker_bus.push(is_kill);
+				}
+			}
+
+			prev_hp[player.index] = player.health;
+		}
+	}
+
+    void log_bomb_status(const shared::BombData& out_data)
+    {
+        static auto last_log_time = std::chrono::steady_clock::now();
+        auto now = std::chrono::steady_clock::now();
+        if (std::chrono::duration_cast<std::chrono::seconds>(now - last_log_time).count() >= 3)
+        {
+            std::string state = "none";
+            if (out_data.is_planted) state = "planted";
+            else if (out_data.is_carried) state = "carried";
+            else if (out_data.is_dropped) state = "dropped";
+
+            printf("[BOMB LOG] State: %s | Pos: (%.1f, %.1f, %.1f) | Timer: %.1f\n",
+                state.c_str(), out_data.position.m_x, out_data.position.m_y, out_data.position.m_z, out_data.timer);
+            last_log_time = now;
+        }
+    }
+}
 
 // === OPTIMIZED Entity Cache Update ===
 // Replaces old 0-4096 full scan with bitmap-based scanning
@@ -77,12 +163,16 @@ void f::run()
 		}
 	}
 
-	// === ������ ������� ���� ��� �� ===
-	// � ����� ���� ����� ������ �������	// В функции get_module_info().first
+	// ===      ===
+	//      	// В функции get_module_info().first
 	const auto client_base = m_memory->get_module_info(CLIENT_DLL).first.value_or(0);
 
 	get_map();
 	get_player_info();
+
+	const auto bomb = shared::g_game_state.get_bomb();
+	if (bomb.is_planted)
+		m_data["m_bomb"] = shared::bomb_to_json(bomb);
 }
 
 void f::get_map()
@@ -143,6 +233,7 @@ void f::get_player_info()
 
 // New function: collect shared data for ImGui ESP
 void f::collect_shared_data()
+
 {
 	std::vector<shared::PlayerData> players;
 	shared::LocalPlayerData local{};
@@ -214,7 +305,7 @@ void f::collect_shared_data()
 	// Performance: Direct bitmap access instead of linear search
 	auto player_indices = core::g_simple_cache.get_player_indices();
 	
-	for (int32_t idx : player_indices)
+		for (int32_t idx : player_indices)
 	{
 		try
 		{
@@ -228,15 +319,14 @@ void f::collect_shared_data()
 				continue;
 			
 			const auto health = pawn->m_iHealth();
-			if (health <= 0 || health > 100)
-				continue;
+            bool is_dead = (health <= 0 || health > 100);
 			
 			// Fill shared data
 			shared::PlayerData player_data;
 			if (f::players::get_shared_data(idx, controller, pawn, player_data))
 			{
-				// Memory thread only stores 3D world data
-				// Projection to screen coordinates is done in Render Thread
+                player_data.health = health;
+                player_data.is_dead = is_dead;
 				player_data.is_on_screen = false;  // Will be calculated in overlay
 				
 				players.push_back(player_data);
@@ -247,7 +337,6 @@ void f::collect_shared_data()
 			continue;
 		}
 	}
-	
 		
 	// Get map name for shared state
 	static std::string last_valid_map = "menu";
@@ -266,20 +355,29 @@ void f::collect_shared_data()
 		}
 	}
 	
+	shared::BombData bomb{};
+	f::bomb::find_carried_dropped_bomb(bomb);
+
+	log_bomb_status(bomb);
+
+	process_hitmarkers(local, players);
+
 	// Update shared game state (legacy for WebSocket)
 	shared::g_game_state.update_local(local);
 	shared::g_game_state.update_players(players);
+	shared::g_game_state.update_bomb(bomb);
 	shared::g_game_state.update_map(current_map);
 	// Update double-buffered state for ImGui ESP (lock-free)
 	shared::g_double_buffered_state.write_local(local);
 	shared::g_double_buffered_state.write_players(players);
+	shared::g_double_buffered_state.write_bomb(bomb);
 	shared::g_double_buffered_state.write_map(current_map);
 	
 	// Project player positions to screen for Triggerbot BEFORE swap
 	// Get screen dimensions
 	int screen_w = GetSystemMetrics(SM_CXSCREEN);
 	int screen_h = GetSystemMetrics(SM_CYSCREEN);
-	
+
 	for (auto& player : players)
 	{
 		vector_t screen_pos;

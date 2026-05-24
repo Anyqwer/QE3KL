@@ -50,6 +50,7 @@ namespace g_offsets
     inline std::ptrdiff_t m_pAimPunchServices = 0;
     inline std::ptrdiff_t m_iShotsFired = 0;
     inline std::ptrdiff_t m_fFlags = 0;
+    inline std::ptrdiff_t m_hOwnerEntity = 0;
 
     // tkazer_base entity offsets
     inline std::ptrdiff_t m_iHealth = 0;

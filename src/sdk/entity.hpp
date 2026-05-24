@@ -138,6 +138,7 @@ public:
 	SCHEMA_ADD_OFFSET(f_vector, m_angEyeAngles, cs2_dumper::schemas::client_dll::C_CSPlayerPawn::m_angEyeAngles);
 	SCHEMA_ADD_OFFSET(c_aim_punch_services*, m_pAimPunchServices, g_offsets::m_pAimPunchServices);  // CCSPlayer_AimPunchServices*
 	SCHEMA_ADD_OFFSET(int32_t, m_iShotsFired, g_offsets::m_iShotsFired);  // int32
+	SCHEMA_ADD_OFFSET(bool, m_bIsScoped, cs2_dumper::schemas::client_dll::C_CSPlayerPawn::m_bIsScoped);
 
 	const std::string get_model_name();
 };
@@ -173,6 +174,7 @@ class c_planted_c4 : public c_base_entity
 {
 public:
 	SCHEMA_ADD_OFFSET(bool, m_bBombTicking, cs2_dumper::schemas::client_dll::C_PlantedC4::m_bBombTicking);
+	SCHEMA_ADD_OFFSET(int32_t, m_nBombSite, cs2_dumper::schemas::client_dll::C_PlantedC4::m_nBombSite);
 	SCHEMA_ADD_OFFSET(float, m_flC4Blow, cs2_dumper::schemas::client_dll::C_PlantedC4::m_flC4Blow);
 	SCHEMA_ADD_OFFSET(bool, m_bBombDefused, cs2_dumper::schemas::client_dll::C_PlantedC4::m_bBombDefused);
 	SCHEMA_ADD_OFFSET(bool, m_bBeingDefused, cs2_dumper::schemas::client_dll::C_PlantedC4::m_bBeingDefused);

@@ -153,8 +153,20 @@ namespace updater
                     LOG_ERROR("client_dll.json missing m_pCollision in C_BaseEntity fields");
                 }
 
-                // C_BaseEntity::m_fFlags
+                // C_BaseEntity::m_hOwnerEntity
                 if (classes.contains("C_BaseEntity") && 
+                    classes["C_BaseEntity"].contains("fields") &&
+                    classes["C_BaseEntity"]["fields"].contains("m_hOwnerEntity"))
+                {
+                    g_offsets::m_hOwnerEntity = classes["C_BaseEntity"]["fields"]["m_hOwnerEntity"].get<std::ptrdiff_t>();
+                }
+                else
+                {
+                    LOG_ERROR("client_dll.json missing m_hOwnerEntity in C_BaseEntity fields");
+                }
+                
+                // C_BaseEntity::m_fFlags
+                if (classes.contains("C_BaseEntity") &&
                     classes["C_BaseEntity"].contains("fields") &&
                     classes["C_BaseEntity"]["fields"].contains("m_fFlags"))
                 {
@@ -191,7 +203,7 @@ namespace updater
 
                 // Load ActionTrackingServices offset
                 if (client_dll_json["client.dll"].contains("classes") &&
-                    client_dll_json["client.dll"]["classes"].contains("CCSPlayerController") &&
+                    client_dll_json["client.dll"].contains("CCSPlayerController") &&
                     client_dll_json["client.dll"]["classes"]["CCSPlayerController"].contains("fields") &&
                     client_dll_json["client.dll"]["classes"]["CCSPlayerController"]["fields"].contains("m_pActionTrackingServices"))
                 {
@@ -269,7 +281,7 @@ namespace updater
                 // =========================================================================
                 // Load NumRoundKills offset
                 if (client_dll_json["client.dll"].contains("classes") &&
-                    client_dll_json["client.dll"]["classes"].contains("CCSPlayerController_ActionTrackingServices") &&
+                    client_dll_json["client.dll"].contains("CCSPlayerController_ActionTrackingServices") &&
                     client_dll_json["client.dll"]["classes"]["CCSPlayerController_ActionTrackingServices"].contains("fields") &&
                     client_dll_json["client.dll"]["classes"]["CCSPlayerController_ActionTrackingServices"]["fields"].contains("m_iNumRoundKills"))
                 {
@@ -401,3 +413,5 @@ namespace updater
     }
 
 } // namespace updater
+
+

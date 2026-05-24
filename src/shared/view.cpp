@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "view.hpp"
 #include <algorithm>
+#include <cfloat>
 #include "../tkazer_base/CS2_External/OS-ImGui/imgui/imgui.h"
 
 
@@ -48,37 +49,33 @@ namespace shared
         );
         
         vector_t screen_bottom, screen_top;
-        
-        if (!world_to_screen(bottom_pos, screen_bottom, view_matrix, screen_width, screen_height) ||
-            !world_to_screen(top_pos, screen_top, view_matrix, screen_width, screen_height))
-        {
-            return false; // Player off-screen
-        }
-        
-        // Calculate 2D box dimensions
+        const bool feet_ok = world_to_screen_project(bottom_pos, screen_bottom, view_matrix, screen_width, screen_height);
+        const bool head_ok = world_to_screen_project(top_pos, screen_top, view_matrix, screen_width, screen_height);
+
+        if (!feet_ok && !head_ok)
+            return false;
+
+        if (!feet_ok)
+            screen_bottom = screen_top;
+        if (!head_ok)
+            screen_top = screen_bottom;
+
         float height = screen_bottom.m_y - screen_top.m_y;
-        
-        // Sanity check: height should be positive and reasonable
-        if (height < 5.0f || height > screen_height * 0.8f) {
-            return false; // Invalid projection
-        }
-        
+        if (height < 0.0f)
+            height = -height;
+
+        if (height < 5.0f || height > screen_height * 0.95f)
+            return false;
+
         float width = height * PLAYER_ASPECT_RATIO;
-        
-        // Center the box horizontally
         out_x = screen_top.m_x - (width * 0.5f);
         out_y = screen_top.m_y;
         out_width = width;
         out_height = height;
-        
-        // Additional check: box should be at least partially on screen
-        if (out_x + out_width < 0 || out_x > screen_width ||
-            out_y + out_height < 0 || out_y > screen_height)
-        {
-            return false;
-        }
-        
-        return true;
+
+        return screen_rect_intersects_viewport(
+            out_x, out_y, out_x + out_width, out_y + out_height,
+            screen_width, screen_height);
     }
 
     float cross_product(const ImVec2& O, const ImVec2& A, const ImVec2& B) {
@@ -111,6 +108,46 @@ namespace shared
         return hull;
     }
 
+    bool world_to_screen_project(
+        const vector_t& world_pos,
+        vector_t& out_screen_pos,
+        const std::array<float, 16>& view_matrix,
+        float screen_width,
+        float screen_height
+    )
+    {
+        float x = view_matrix[0] * world_pos.m_x + view_matrix[1] * world_pos.m_y + view_matrix[2] * world_pos.m_z + view_matrix[3];
+        float y = view_matrix[4] * world_pos.m_x + view_matrix[5] * world_pos.m_y + view_matrix[6] * world_pos.m_z + view_matrix[7];
+        float z = view_matrix[8] * world_pos.m_x + view_matrix[9] * world_pos.m_y + view_matrix[10] * world_pos.m_z + view_matrix[11];
+        float w = view_matrix[12] * world_pos.m_x + view_matrix[13] * world_pos.m_y + view_matrix[14] * world_pos.m_z + view_matrix[15];
+
+        if (w < 0.001f)
+            return false;
+
+        const float inv_w = 1.0f / w;
+        x *= inv_w;
+        y *= inv_w;
+
+        out_screen_pos.m_x = (screen_width * 0.5f) + (x * screen_width * 0.5f);
+        out_screen_pos.m_y = (screen_height * 0.5f) - (y * screen_height * 0.5f);
+        out_screen_pos.m_z = w;
+        return true;
+    }
+
+    bool screen_rect_intersects_viewport(
+        float min_x, float min_y, float max_x, float max_y,
+        float screen_width, float screen_height,
+        float margin)
+    {
+        if (max_x < min_x || max_y < min_y)
+            return false;
+
+        return !(max_x < -margin ||
+            min_x > screen_width + margin ||
+            max_y < -margin ||
+            min_y > screen_height + margin);
+    }
+
     bool world_to_screen(
         const vector_t& world_pos,
         vector_t& out_screen_pos,
@@ -119,32 +156,14 @@ namespace shared
         float screen_height
     )
     {
-        // Matrix multiplication
-        float x = view_matrix[0] * world_pos.m_x + view_matrix[1] * world_pos.m_y + view_matrix[2] * world_pos.m_z + view_matrix[3];
-        float y = view_matrix[4] * world_pos.m_x + view_matrix[5] * world_pos.m_y + view_matrix[6] * world_pos.m_z + view_matrix[7];
-        float z = view_matrix[8] * world_pos.m_x + view_matrix[9] * world_pos.m_y + view_matrix[10] * world_pos.m_z + view_matrix[11];
-        float w = view_matrix[12] * world_pos.m_x + view_matrix[13] * world_pos.m_y + view_matrix[14] * world_pos.m_z + view_matrix[15];
-        
-        // Behind camera
-        if (w < 0.001f)
+        if (!world_to_screen_project(world_pos, out_screen_pos, view_matrix, screen_width, screen_height))
             return false;
-        
-        // Perspective divide
-        float inv_w = 1.0f / w;
-        x *= inv_w;
-        y *= inv_w;
-        
-        // Convert to screen coordinates
-        out_screen_pos.m_x = (screen_width * 0.5f) + (x * screen_width * 0.5f);
-        out_screen_pos.m_y = (screen_height * 0.5f) - (y * screen_height * 0.5f);
-        out_screen_pos.m_z = z;  // Depth
-        
-        // Check if on screen
-        if (out_screen_pos.m_x < 0 || out_screen_pos.m_x > screen_width)
+
+        if (out_screen_pos.m_x < 0.0f || out_screen_pos.m_x > screen_width)
             return false;
-        if (out_screen_pos.m_y < 0 || out_screen_pos.m_y > screen_height)
+        if (out_screen_pos.m_y < 0.0f || out_screen_pos.m_y > screen_height)
             return false;
-        
+
         return true;
     }
     
@@ -183,56 +202,33 @@ namespace shared
         vector_t screen_corners[8];
         int visible_corners = 0;
         
+        float min_screen_x = FLT_MAX;
+        float max_screen_x = -FLT_MAX;
+        float min_screen_y = FLT_MAX;
+        float max_screen_y = -FLT_MAX;
+
         for (int i = 0; i < 8; i++)
         {
-            if (world_to_screen(corners[i], screen_corners[i], view_matrix, screen_width, screen_height))
-            {
-                visible_corners++;
-            }
+            if (!world_to_screen_project(corners[i], screen_corners[i], view_matrix, screen_width, screen_height))
+                continue;
+
+            visible_corners++;
+            min_screen_x = std::min(min_screen_x, screen_corners[i].m_x);
+            max_screen_x = std::max(max_screen_x, screen_corners[i].m_x);
+            min_screen_y = std::min(min_screen_y, screen_corners[i].m_y);
+            max_screen_y = std::max(max_screen_y, screen_corners[i].m_y);
         }
-        
-        // If no corners are visible, box is off-screen
+
         if (visible_corners == 0)
             return false;
-        
-        // Find min/max X and Y among visible corners
-        float min_screen_x = screen_width;
-        float max_screen_x = 0.0f;
-        float min_screen_y = screen_height;
-        float max_screen_y = 0.0f;
-        
-        for (int i = 0; i < 8; i++)
-        {
-            if (screen_corners[i].m_x > 0 && screen_corners[i].m_x < screen_width &&
-                screen_corners[i].m_y > 0 && screen_corners[i].m_y < screen_height)
-            {
-                min_screen_x = std::min(min_screen_x, screen_corners[i].m_x);
-                max_screen_x = std::max(max_screen_x, screen_corners[i].m_x);
-                min_screen_y = std::min(min_screen_y, screen_corners[i].m_y);
-                max_screen_y = std::max(max_screen_y, screen_corners[i].m_y);
-            }
-        }
-        
-        // If still no valid corners after filtering, use first visible
-        if (min_screen_x == screen_width)
-        {
-            for (int i = 0; i < 8; i++)
-            {
-                if (screen_corners[i].m_x > 0)
-                {
-                    min_screen_x = std::min(min_screen_x, screen_corners[i].m_x);
-                    max_screen_x = std::max(max_screen_x, screen_corners[i].m_x);
-                    min_screen_y = std::min(min_screen_y, screen_corners[i].m_y);
-                    max_screen_y = std::max(max_screen_y, screen_corners[i].m_y);
-                }
-            }
-        }
-        
+
         out_x = min_screen_x;
         out_y = min_screen_y;
         out_width = max_screen_x - min_screen_x;
         out_height = max_screen_y - min_screen_y;
-        
-        return true;
+
+        return screen_rect_intersects_viewport(
+            out_x, out_y, out_x + out_width, out_y + out_height,
+            screen_width, screen_height);
     }
 }

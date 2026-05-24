@@ -87,7 +87,7 @@ namespace shared
     {
         tls_bomb_json.clear();
         
-        if (bomb.is_planted || bomb.is_dropped)
+        if (bomb.is_planted || bomb.is_dropped || bomb.is_carried)
         {
             tls_bomb_json["m_position"]["x"] = bomb.position.m_x;
             tls_bomb_json["m_position"]["y"] = bomb.position.m_y;
@@ -150,3 +150,4 @@ namespace shared
         return tls_state_json;
     }
 }
+

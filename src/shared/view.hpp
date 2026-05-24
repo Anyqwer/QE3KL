@@ -7,14 +7,29 @@ struct ImVec2;
 
 namespace shared
 {
-    // World to screen transformation
-    // Returns true if point is on screen
+    // World to screen — true only if the point lies inside the viewport.
     bool world_to_screen(
         const vector_t& world_pos,
         vector_t& out_screen_pos,
         const std::array<float, 16>& view_matrix,
         float screen_width,
         float screen_height
+    );
+
+    // Always projects when in front of the camera (allows off-screen coordinates).
+    bool world_to_screen_project(
+        const vector_t& world_pos,
+        vector_t& out_screen_pos,
+        const std::array<float, 16>& view_matrix,
+        float screen_width,
+        float screen_height
+    );
+
+    // True if the 2D rect overlaps the screen (with optional margin).
+    bool screen_rect_intersects_viewport(
+        float min_x, float min_y, float max_x, float max_y,
+        float screen_width, float screen_height,
+        float margin = 48.0f
     );
     
     // Calculate 2D box for ESP

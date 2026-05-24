@@ -4,6 +4,7 @@
 #include <array>
 #include <unordered_map>
 #include <shared_mutex>
+#include <mutex>
 #include <atomic>
 #include <algorithm>
 #include "../sdk/datatypes/vector.hpp"
@@ -20,6 +21,7 @@ namespace shared
     {
         // Identity
         int index = 0;
+        int entity_id = 0;  // pawn entity entry index (m_iIDEntIndex / crosshair)
         std::string name;
         std::string steam_id;
         
@@ -42,6 +44,7 @@ namespace shared
         int money = 0;
         bool has_helmet = false;
         bool has_defuser = false;
+        bool is_scoped = false;
         
         // Position in world coordinates
         vector_t world_pos;
@@ -297,7 +300,25 @@ namespace shared
         );
     }
 
+    // Hitmarker pulse (memory thread -> render thread)
+    struct HitmarkerPulse
+    {
+        bool is_kill = false;
+    };
+
+    class HitmarkerBus
+    {
+    public:
+        void push(bool is_kill);
+        std::vector<HitmarkerPulse> drain_all();
+
+    private:
+        mutable std::mutex mutex;
+        std::vector<HitmarkerPulse> queue;
+    };
+
     // Global instances
     inline GameState g_game_state;  // Legacy (for WebSocket)
     inline DoubleBufferedGameState g_double_buffered_state;  // For ImGui ESP
+    inline HitmarkerBus g_hitmarker_bus;
 }

@@ -17,6 +17,7 @@
 #include <vector>
 #include <cstdio>
 #include <cmath>
+#include <cfloat>
 
 // Bone connections for skeleton rendering - updated schema
 static const std::pair<int, int> boneConnectionsFull[] = {
@@ -55,11 +56,51 @@ struct HitMarkerEvent {
     bool is_kill;
 };
 static std::vector<HitMarkerEvent> g_hitmarkers;
-static std::map<int, int> g_health_cache; // previous hp per player index
 static std::map<int, float> g_anim_hp;    // animated HP per player index
 
 // Memory reader (shared across files)
 extern const std::unique_ptr<c_memory> m_memory;
+
+static constexpr float k_esp_small_font_scale = 0.62f;
+static constexpr float k_esp_tiny_font_scale = 0.52f;
+
+static void DrawEspText(ImDrawList* draw_list, ImVec2 pos, ImU32 color, const char* text, float font_scale = k_esp_small_font_scale)
+{
+	const float font_size = ImGui::GetFontSize() * font_scale;
+	draw_list->AddText(ImGui::GetFont(), font_size, ImVec2(pos.x + 1.0f, pos.y + 1.0f), IM_COL32(0, 0, 0, 200), text);
+	draw_list->AddText(ImGui::GetFont(), font_size, pos, color, text);
+}
+
+static void DrawHpNumberOnBar(
+	ImDrawList* draw_list,
+	float bar_x, float bar_y, float bar_w, float bar_h,
+	float fill_w, float fill_h,
+	float animated_hp,
+	bool vertical)
+{
+	char hp_text[8];
+	snprintf(hp_text, sizeof(hp_text), "%d", static_cast<int>(std::round(animated_hp)));
+	const float font_size = ImGui::GetFontSize() * k_esp_tiny_font_scale;
+	const ImVec2 text_size = ImGui::GetFont()->CalcTextSizeA(font_size, FLT_MAX, 0.0f, hp_text);
+	const ImU32 hp_text_color = IM_COL32(120, 200, 255, 255);
+
+	ImVec2 text_pos;
+	if (vertical)
+	{
+		text_pos = ImVec2(
+			bar_x + (bar_w * 0.5f) - text_size.x * 0.5f,
+			bar_y + bar_h - fill_h - text_size.y * 0.5f);
+	}
+	else
+	{
+		text_pos = ImVec2(
+			bar_x + fill_w - text_size.x * 0.5f,
+			bar_y + (bar_h * 0.5f) - text_size.y * 0.5f);
+	}
+
+	draw_list->AddText(ImGui::GetFont(), font_size, ImVec2(text_pos.x + 1.0f, text_pos.y + 1.0f), IM_COL32(0, 0, 0, 200), hp_text);
+	draw_list->AddText(ImGui::GetFont(), font_size, text_pos, hp_text_color, hp_text);
+}
 
 // Draw corner box with gradient fill and outlined corner lines
 void DrawCornerBoxAndGradient(ImDrawList* draw_list, float x, float y, float w, float h, ImU32 color)
@@ -221,33 +262,129 @@ void RenderSmokeGrenade(uintptr_t entity_ptr, float global_time, const std::arra
     }
 }
 
-// Render hitmarkers (center-screen)
+static void DrainHitmarkerBus()
+{
+    for (const auto& pulse : shared::g_hitmarker_bus.drain_all())
+        g_hitmarkers.push_back({ ImGui::GetTime(), pulse.is_kill });
+}
+
+static void DrawOutlinedHitmarkerLine(ImDrawList* draw_list, ImVec2 a, ImVec2 b, ImU32 color, float thickness)
+{
+    draw_list->AddLine(a, b, IM_COL32(0, 0, 0, 200), thickness + 2.0f);
+    draw_list->AddLine(a, b, color, thickness);
+}
+
+// Render hitmarkers (center-screen, CS2-style X with fade + spread)
 void RenderHitmarkers(ImDrawList* draw_list, ImVec2 screen_center)
 {
-    double current_time = ImGui::GetTime();
-    double duration = 0.5; // seconds
+    constexpr double duration = 0.42;
+    const double current_time = ImGui::GetTime();
 
     for (auto it = g_hitmarkers.begin(); it != g_hitmarkers.end(); ) {
-        double time_alive = current_time - it->time;
+        const double time_alive = current_time - it->time;
         if (time_alive > duration) {
             it = g_hitmarkers.erase(it);
             continue;
         }
 
-        float alpha_fade = static_cast<float>(1.0 - (time_alive / duration));
-        int alpha = static_cast<int>(255 * alpha_fade);
-        ImU32 color = it->is_kill ? IM_COL32(255, 50, 50, alpha) : IM_COL32(255, 255, 255, alpha);
+        const float t = static_cast<float>(time_alive / duration);
+        const float fade = 1.0f - (t * t);
+        const int alpha = static_cast<int>(255.0f * fade);
+        const ImU32 color = it->is_kill
+            ? IM_COL32(255, 30, 30, alpha)
+            : IM_COL32(245, 245, 245, alpha);
 
-        float size = 6.0f + static_cast<float>(time_alive * 8.0);
-        float gap = 4.0f;
-        float thickness = 1.5f;
+        const float spread = it->is_kill ? (6.0f + t * 18.0f) : (5.0f + t * 12.0f);
+        const float arm = it->is_kill ? (9.0f + (1.0f - t) * 4.0f) : (7.0f + (1.0f - t) * 2.0f);
+        const float thickness = it->is_kill ? 2.5f : 1.6f;
 
-        draw_list->AddLine(ImVec2(screen_center.x - gap, screen_center.y - gap), ImVec2(screen_center.x - size, screen_center.y - size), color, thickness);
-        draw_list->AddLine(ImVec2(screen_center.x + gap, screen_center.y - gap), ImVec2(screen_center.x + size, screen_center.y - size), color, thickness);
-        draw_list->AddLine(ImVec2(screen_center.x - gap, screen_center.y + gap), ImVec2(screen_center.x - size, screen_center.y + size), color, thickness);
-        draw_list->AddLine(ImVec2(screen_center.x + gap, screen_center.y + gap), ImVec2(screen_center.x + size, screen_center.y + size), color, thickness);
+        DrawOutlinedHitmarkerLine(draw_list,
+            ImVec2(screen_center.x - spread, screen_center.y - spread),
+            ImVec2(screen_center.x - spread - arm, screen_center.y - spread - arm),
+            color, thickness);
+        DrawOutlinedHitmarkerLine(draw_list,
+            ImVec2(screen_center.x + spread, screen_center.y - spread),
+            ImVec2(screen_center.x + spread + arm, screen_center.y - spread - arm),
+            color, thickness);
+        DrawOutlinedHitmarkerLine(draw_list,
+            ImVec2(screen_center.x - spread, screen_center.y + spread),
+            ImVec2(screen_center.x - spread - arm, screen_center.y + spread + arm),
+            color, thickness);
+        DrawOutlinedHitmarkerLine(draw_list,
+            ImVec2(screen_center.x + spread, screen_center.y + spread),
+            ImVec2(screen_center.x + spread + arm, screen_center.y + spread + arm),
+            color, thickness);
 
         ++it;
+    }
+}
+
+static void DrawOutlinedText(ImDrawList* draw_list, ImVec2 pos, ImU32 color, const char* text)
+{
+    draw_list->AddText(ImVec2(pos.x + 1.0f, pos.y + 1.0f), IM_COL32(0, 0, 0, 220), text);
+    draw_list->AddText(pos, color, text);
+}
+
+// Bomb timer HUD (top-center) + optional world label at bomb position
+void RenderBombTimer(const std::array<float, 16>& view_matrix, float screen_w, float screen_h)
+{
+    if (!esp::g_menu_config.ShowBombTimer)
+        return;
+
+    const auto bomb = shared::g_double_buffered_state.read_bomb();
+    if (!bomb.is_planted || bomb.timer <= 0.0f)
+        return;
+
+    const char* site_name = (bomb.site == 1) ? "B" : "A";
+    char timer_line[64];
+    snprintf(timer_line, sizeof(timer_line), "C4  %.1fs  Site %s", bomb.timer, site_name);
+
+    char status_line[64] = {};
+    if (bomb.is_defusing)
+        snprintf(status_line, sizeof(status_line), "DEFUSING %.1fs", bomb.defuse_timer);
+    else if (bomb.can_defuse)
+        snprintf(status_line, sizeof(status_line), "CAN DEFUSE");
+
+    const ImU32 timer_color = (bomb.timer < 10.0f)
+        ? IM_COL32(255, 60, 60, 255)
+        : (bomb.timer < 20.0f ? IM_COL32(255, 200, 60, 255) : IM_COL32(255, 255, 255, 255));
+
+    const ImVec2 timer_size = ImGui::CalcTextSize(timer_line);
+    const float panel_w = std::max(timer_size.x + 28.0f, 180.0f);
+    const float panel_h = status_line[0] ? 56.0f : 40.0f;
+    const float panel_x = (screen_w - panel_w) * 0.5f;
+    const float panel_y = 18.0f;
+
+    ImDrawList* bg = ImGui::GetBackgroundDrawList();
+    bg->AddRectFilled(
+        ImVec2(panel_x, panel_y),
+        ImVec2(panel_x + panel_w, panel_y + panel_h),
+        IM_COL32(12, 12, 12, 190), 6.0f);
+    bg->AddRect(
+        ImVec2(panel_x, panel_y),
+        ImVec2(panel_x + panel_w, panel_y + panel_h),
+        IM_COL32(255, 80, 40, 220), 6.0f, 0, 1.5f);
+
+    DrawOutlinedText(bg,
+        ImVec2(panel_x + (panel_w - timer_size.x) * 0.5f, panel_y + 8.0f),
+        timer_color, timer_line);
+
+    if (status_line[0]) {
+        const ImVec2 status_size = ImGui::CalcTextSize(status_line);
+        DrawOutlinedText(bg,
+            ImVec2(panel_x + (panel_w - status_size.x) * 0.5f, panel_y + 30.0f),
+            IM_COL32(120, 200, 255, 255), status_line);
+    }
+
+    // 3D label at bomb position
+    vector_t screen_pos;
+    if (shared::world_to_screen(bomb.position, screen_pos, view_matrix, screen_w, screen_h)) {
+        char world_text[32];
+        snprintf(world_text, sizeof(world_text), "%.1fs", bomb.timer);
+        const ImVec2 wsize = ImGui::CalcTextSize(world_text);
+        DrawOutlinedText(bg,
+            ImVec2(screen_pos.m_x - wsize.x * 0.5f, screen_pos.m_y - 18.0f),
+            timer_color, world_text);
     }
 }
 
@@ -317,12 +454,12 @@ void RenderESP()
 
         bool use_extrapolation = (player.velocity.length_sqr() > 10.0f) && (esp::g_menu_config.ExtrapolationAmount > 0.0f);
 
-        // === SMART FRUSTUM CULLING ===
+        // === FRUSTUM: skip only if completely behind camera ===
         vector_t screenPosFeet, screenPosHead;
-        bool feet_on_screen = shared::world_to_screen(player.get_lerp_position(), screenPosFeet, view_matrix, screenW, screenH);
-        bool head_on_screen = shared::world_to_screen(player.head_pos, screenPosHead, view_matrix, screenW, screenH);
+        const bool feet_proj = shared::world_to_screen_project(player.get_lerp_position(), screenPosFeet, view_matrix, screenW, screenH);
+        const bool head_proj = shared::world_to_screen_project(player.head_pos, screenPosHead, view_matrix, screenW, screenH);
 
-        if (!feet_on_screen && !head_on_screen)
+        if (!feet_proj && !head_proj)
             continue;
 
         // === DYNAMIC BONE-BASED BOUNDING BOX ===
@@ -331,7 +468,7 @@ void RenderESP()
         float boxX = 0, boxY = 0, boxWidth = 0, boxHeight = 0;
         bool valid_box = false;
 
-        if (player.bone_mask != 0) {
+                if (player.bone_mask != 0) {
             float minX = 99999.0f, minY = 99999.0f;
             float maxX = -99999.0f, maxY = -99999.0f;
             int valid_bones = 0;
@@ -345,6 +482,7 @@ void RenderESP()
                     if (use_extrapolation) bone_pos = player.get_extrapolated_bone(bone_pos);
 
                     vector_t screen_pos;
+                    // ВАЖНО: учитываем только те точки, которые реально на экране
                     if (shared::world_to_screen(bone_pos, screen_pos, view_matrix, screenW, screenH)) {
                         minX = std::min(minX, screen_pos.m_x);
                         minY = std::min(minY, screen_pos.m_y);
@@ -354,12 +492,13 @@ void RenderESP()
                     }
                 }
             }
-
+            
+            // ... (остальной код для головы и формирования boxX/boxY) ...
             // Захватываем саму голову с запасом, чтобы бокс не резал макушку
             vector_t head = player.head_pos;
             if (use_extrapolation) head = player.get_extrapolated_bone(head);
             vector_t head_screen;
-            if (shared::world_to_screen(head, head_screen, view_matrix, screenW, screenH)) {
+            if (shared::world_to_screen_project(head, head_screen, view_matrix, screenW, screenH)) {
                 minX = std::min(minX, head_screen.m_x - 6.0f);
                 maxX = std::max(maxX, head_screen.m_x + 6.0f);
                 minY = std::min(minY, head_screen.m_y - 8.0f);
@@ -378,7 +517,19 @@ void RenderESP()
                 boxY = minY - (height * 0.05f);
                 boxWidth = width * 1.30f;
                 boxHeight = height * 1.10f;
-                valid_box = true;
+
+                // --- ДОБАВЛЯЕМ КЛАМПИНГ ЗДЕСЬ ---
+                // Ограничиваем координаты в рамках экрана с запасом
+                float margin = 500.0f; // Запас за пределами экрана
+                boxX = std::clamp(boxX, -margin, screenW + margin - boxWidth);
+                boxY = std::clamp(boxY, -margin, screenH + margin - boxHeight);
+                // Ограничиваем размеры
+                boxWidth = std::clamp(boxWidth, 10.0f, screenW * 2.0f);
+                boxHeight = std::clamp(boxHeight, 10.0f, screenH * 2.0f);
+                // ---------------------------------
+
+                valid_box = shared::screen_rect_intersects_viewport(
+                    boxX, boxY, boxX + boxWidth, boxY + boxHeight, screenW, screenH);
             }
         }
 
@@ -453,13 +604,8 @@ void RenderESP()
                 // Animated fill
                 drawList->AddRectFilled(ImVec2(barX, boxY + boxHeight - bar_height), ImVec2(barX + esp::g_menu_config.HealthBarWidth, boxY + boxHeight), hp_color);
 
-                // Digital text
-                std::string hp_text = std::to_string(static_cast<int>(std::round(g_anim_hp[player.index])));
-                ImVec2 textSize = ImGui::CalcTextSize(hp_text.c_str());
-                ImVec2 textPos(barX + (esp::g_menu_config.HealthBarWidth * 0.5f) - (textSize.x * 0.2f), boxY + boxHeight - bar_height - (textSize.y * 0.2f));
-                drawList->AddText(ImVec2(textPos.x - 1, textPos.y), IM_COL32(0,0,0,255), hp_text.c_str());
-                drawList->AddText(ImVec2(textPos.x + 1, textPos.y), IM_COL32(0,0,0,255), hp_text.c_str());
-                drawList->AddText(textPos, IM_COL32(255,255,255,255), hp_text.c_str());
+                DrawHpNumberOnBar(drawList, barX, boxY, esp::g_menu_config.HealthBarWidth, boxHeight,
+                    0.0f, bar_height, g_anim_hp[player.index], true);
             }
             else
             {
@@ -469,45 +615,47 @@ void RenderESP()
 
                 drawList->AddRectFilled(ImVec2(barX - 1.0f, barY - 1.0f), ImVec2(barX + boxWidth + 1.0f, barY + esp::g_menu_config.HealthBarWidth + 1.0f), IM_COL32(0,0,0,180));
                 drawList->AddRectFilled(ImVec2(barX, barY), ImVec2(barX + barWidth, barY + esp::g_menu_config.HealthBarWidth), hp_color);
+
+                DrawHpNumberOnBar(drawList, barX, barY, boxWidth, esp::g_menu_config.HealthBarWidth,
+                    barWidth, 0.0f, g_anim_hp[player.index], false);
             }
         }
 
-        // === Money + Weapon display (маленький шрифт, колонка справа) ===
+        // === Money + Weapon + scope (колонка справа) ===
         {
             char money_str[32];
             snprintf(money_str, sizeof(money_str), "$%d", player.money);
-            ImU32 money_color = IM_COL32(133, 187, 101, 255);
-
-            float small_font_size = ImGui::GetFontSize() * 0.8f;
+            const ImU32 money_color = IM_COL32(133, 187, 101, 255);
+            const float line_h = ImGui::GetFontSize() * k_esp_small_font_scale + 2.0f;
             ImVec2 text_pos(boxX + boxWidth + 4.0f, boxY);
 
-            drawList->AddText(ImGui::GetFont(), small_font_size, text_pos, money_color, money_str);
+            DrawEspText(drawList, text_pos, money_color, money_str);
 
-            // Если включено отображение оружия, рисуем его под суммой
-            if (esp::g_menu_config.ShowWeapon && !player.weapon_name.empty()) {
-                ImVec2 weapon_pos(text_pos.x, text_pos.y + small_font_size + 2.0f);
-                ImU32 wep_color = IM_COL32(200, 200, 200, 220);
-                drawList->AddText(ImGui::GetFont(), small_font_size, weapon_pos, wep_color, player.weapon_name.c_str());
+            float next_y = text_pos.y + line_h;
+            if (esp::g_menu_config.ShowWeapon && !player.weapon_name.empty())
+            {
+                char weapon_line[96];
+                snprintf(weapon_line, sizeof(weapon_line), "%s  %s",
+                    player.weapon_name.c_str(),
+                    player.is_scoped ? "SCOPE" : "NO SCOPE");
+                DrawEspText(drawList, ImVec2(text_pos.x, next_y), IM_COL32(210, 210, 210, 230), weapon_line);
+                next_y += line_h;
+            }
+            else
+            {
+                DrawEspText(drawList, ImVec2(text_pos.x, next_y),
+                    player.is_scoped ? IM_COL32(255, 180, 80, 255) : IM_COL32(160, 160, 160, 220),
+                    player.is_scoped ? "SCOPE" : "NO SCOPE");
             }
         }
 
-        // === Hitmarker detection (compare с предыдущим хп) ===
-        if (g_health_cache.find(player.index) != g_health_cache.end()) {
-            int prev_hp = g_health_cache[player.index];
-            if (player.health < prev_hp && player.health >= 0) {
-                bool is_kill = (player.health == 0);
-                g_hitmarkers.push_back({ ImGui::GetTime(), is_kill });
-            }
-        }
-        g_health_cache[player.index] = player.health;
-
-        // === Name & Weapon ===
+        // === Name (компактный) ===
         if (esp::g_menu_config.ShowName && !player.name.empty())
         {
-            ImVec2 textPos(boxX + boxWidth * 0.5f, boxY - 15.0f);
-            ImVec2 textSize = ImGui::CalcTextSize(player.name.c_str());
-            textPos.x -= textSize.x * 0.5f;
-            drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), player.name.c_str());
+            const float font_size = ImGui::GetFontSize() * k_esp_small_font_scale;
+            const ImVec2 text_size = ImGui::GetFont()->CalcTextSizeA(font_size, FLT_MAX, 0.0f, player.name.c_str());
+            ImVec2 text_pos(boxX + boxWidth * 0.5f - text_size.x * 0.5f, boxY - text_size.y - 4.0f);
+            DrawEspText(drawList, text_pos, IM_COL32(255, 255, 255, 240), player.name.c_str(), k_esp_small_font_scale);
         }
 
 
@@ -537,11 +685,13 @@ void RenderESP()
 
                 vector_t screenPos1, screenPos2;
 
-                if (shared::world_to_screen(bone1_pos, screenPos1, view_matrix, screenW, screenH) &&
-                    shared::world_to_screen(bone2_pos, screenPos2, view_matrix, screenW, screenH))
+                const bool b1 = shared::world_to_screen_project(bone1_pos, screenPos1, view_matrix, screenW, screenH);
+                const bool b2 = shared::world_to_screen_project(bone2_pos, screenPos2, view_matrix, screenW, screenH);
+                if (b1 && b2)
                 {
                     ImVec2 p1(screenPos1.m_x, screenPos1.m_y);
                     ImVec2 p2(screenPos2.m_x, screenPos2.m_y);
+                    drawList->AddLine(p1, p2, IM_COL32(0, 0, 0, 160), skeleton_thickness + 1.0f);
                     drawList->AddLine(p1, p2, skeletonColor, skeleton_thickness);
                 }
             }
@@ -570,6 +720,8 @@ void RenderMenu()
             ImGui::Checkbox("Show Health Bar", &esp::g_menu_config.ShowHealthBar);
             ImGui::Checkbox("Show Name", &esp::g_menu_config.ShowName);
             ImGui::Checkbox("Show Weapon", &esp::g_menu_config.ShowWeapon);
+            ImGui::Checkbox("Bomb Timer HUD", &esp::g_menu_config.ShowBombTimer);
+            ImGui::Checkbox("Hitmarkers", &esp::g_menu_config.ShowHitmarkers);
             ImGui::Separator();
             if (esp::g_menu_config.MonitorRefreshRate > 0) {
                 ImGui::Text("Overlay FPS: %d Hz (auto-detected)", esp::g_menu_config.MonitorRefreshRate);
@@ -748,18 +900,41 @@ void RenderLoop()
         ImGuiWindowFlags_NoBackground |
         ImGuiWindowFlags_NoBringToFrontOnFocus);
 
-    if (esp::g_menu_config.ESPEnabled)
+    DrainHitmarkerBus();
+
+    static std::array<float, 16> cached_view_matrix{};
+    static bool cached_vm_valid = false;
+    static uintptr_t client_base_overlay = 0;
+    if (client_base_overlay == 0)
     {
-        RenderESP();
+        auto module_info = m_memory->get_module_info(CLIENT_DLL);
+        if (module_info.first.has_value())
+            client_base_overlay = module_info.first.value();
+    }
+    if (client_base_overlay != 0)
+    {
+        struct view_matrix_t { float matrix[16]; };
+        auto vm = m_memory->read_t<view_matrix_t>(client_base_overlay + g_offsets::view_matrix);
+        std::copy(std::begin(vm.matrix), std::end(vm.matrix), cached_view_matrix.begin());
+        cached_vm_valid = true;
     }
 
+    const float screen_w = ImGui::GetIO().DisplaySize.x;
+    const float screen_h = ImGui::GetIO().DisplaySize.y;
+
+    if (esp::g_menu_config.ESPEnabled)
+        RenderESP();
+
+    if (cached_vm_valid)
+        RenderBombTimer(cached_view_matrix, screen_w, screen_h);
+
     RenderSniperCrosshair();
-    // Render hitmarkers on top of everything
-    ImVec2 screen_center = ImGui::GetIO().DisplaySize;
-    screen_center.x *= 0.5f;
-    screen_center.y *= 0.5f;
-    ImDrawList* fg = ImGui::GetForegroundDrawList();
-    RenderHitmarkers(fg, screen_center);
+
+    if (esp::g_menu_config.ShowHitmarkers)
+    {
+        ImVec2 screen_center(screen_w * 0.5f, screen_h * 0.5f);
+        RenderHitmarkers(ImGui::GetForegroundDrawList(), screen_center);
+    }
     ImGui::End();
     RenderMenu();
 }
